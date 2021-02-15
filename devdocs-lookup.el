@@ -1,9 +1,11 @@
-;;; devdocs-lookup.el --- jump to documentation on devdocs.io -*- lexical-binding: t; -*-
+;;; devdocs-lookup.el --- Jump to documentation on devdocs.io -*- lexical-binding: t; -*-
 
 ;; This is free and unencumbered software released into the public domain.
 
 ;; Author: Christopher Wellons <wellons@nullprogram.com>
 ;; URL: https://github.com/skeeto/devdocs-lookup
+;; Package-Version: 0
+;; Package-Requires: ((emacs "24.3"))
 
 ;;; Commentary:
 
