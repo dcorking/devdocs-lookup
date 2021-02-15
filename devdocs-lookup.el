@@ -29,10 +29,10 @@
 
 ;; To bypass indicating the subject on each lookup, devdocs-lookup can
 ;; generate interactive commands for each of the individual subjects
-;; by calling `devdocs-setup'.
+;; by calling `devdocs-lookup-setup'.
 
-;; (devdocs-setup)
-;; (global-set-key (kbd "C-h C-c") #'devdocs-lookup-c)
+;; (devdocs-lookup-setup)
+;; (global-set-key (kbd "C-h C-c") #'devdocs-lookup-lookup-c)
 ;; (global-set-key (kbd "C-h C-p") #'devdocs-lookup-python)
 
 ;;; Code:
@@ -41,13 +41,13 @@
 (require 'json)
 (require 'cl-lib)
 
-(defvar devdocs-base-url "https://devdocs.io"
+(defvar devdocs-lookup-base-url "https://devdocs.io"
   "Base url for devdocs.io.")
 
-(defvar devdocs-base-index-url "https://docs.devdocs.io"
+(defvar devdocs-lookup-base-index-url "https://docs.devdocs.io"
   "Base url for devdocs.io.")
 
-(defvar devdocs-subjects
+(defvar devdocs-lookup-subjects
   '(("Angular 2" "angular~2")
     ("Angular 4" "angular~4")
     ("Angular 5" "angular~5")
@@ -419,17 +419,17 @@
     ("webpack" "webpack"))
   "List of subjects supported by devdocs.io.")
 
-(defvar-local devdocs--default-subject nil
+(defvar-local devdocs-lookup--default-subject nil
   "Remembers the subject for the given buffer.")
 
-(defvar devdocs-index (make-hash-table :test 'equal)
+(defvar devdocs-lookup-index (make-hash-table :test 'equal)
   "Hash table for indexes for various subjects.")
 
-(defun devdocs-index (subject &optional callback)
+(defun devdocs-lookup-index (subject &optional callback)
   "Return the devdocs.io index for SUBJECT, optionally async via CALLBACK."
   (cl-declare (special url-http-end-of-headers))
-  (let ((index (gethash subject devdocs-index))
-        (url (format "%s/%s/index.json" devdocs-base-index-url subject)))
+  (let ((index (gethash subject devdocs-lookup-index))
+        (url (format "%s/%s/index.json" devdocs-lookup-base-index-url subject)))
     (cond ((and index callback)
            (funcall callback index))
           ((and index (not callback))
@@ -437,31 +437,31 @@
           ((and (not index) (not callback))
            (with-current-buffer (url-retrieve-synchronously url nil t)
              (goto-char url-http-end-of-headers)
-             (setf (gethash subject devdocs-index) (json-read))))
+             (setf (gethash subject devdocs-lookup-index) (json-read))))
           ((and (not index) callback)
            (url-retrieve
             url
             (lambda (_)
               (goto-char url-http-end-of-headers)
-              (setf (gethash subject devdocs-index) (json-read))
-              (funcall callback (gethash subject devdocs-index))))))))
+              (setf (gethash subject devdocs-lookup-index) (json-read))
+              (funcall callback (gethash subject devdocs-lookup-index))))))))
 
-(defun devdocs-entries (subject)
+(defun devdocs-lookup-entries (subject)
   "Return an association list of the entries in SUBJECT."
-  (cl-loop for entry across (cdr (assoc 'entries (devdocs-index subject)))
+  (cl-loop for entry across (cdr (assoc 'entries (devdocs-lookup-index subject)))
            collect (cons (cdr (assoc 'name entry))
                          (cdr (assoc 'path entry)))))
 
-(defvar devdoc--hist-subjects nil)
+(defvar devdocs-lookup--hist-subjects nil)
 
-(defun devdocs-read-subject ()
+(defun devdocs-lookup-read-subject ()
   "Interactively ask the user for a subject."
-  (let* ((subjects (mapcar #'car devdocs-subjects))
-         (hist 'devdoc--hist-subjects)
+  (let* ((subjects (mapcar #'car devdocs-lookup-subjects))
+         (hist 'devdocs-lookup--hist-subjects)
          (subject (completing-read "Subject: " subjects nil t nil hist)))
-    (cadr (assoc subject devdocs-subjects))))
+    (cadr (assoc subject devdocs-lookup-subjects))))
 
-(defun devdocs--best-match (string names)
+(defun devdocs-lookup--best-match (string names)
   "Return the best match for STRING in NAMES, if any.
 An exact match takes the highest priority, then a partial match
 on symbol boundaries, then any partial match. Matches are
@@ -491,52 +491,52 @@ case-sensitive."
               best-score 60))))
     best-match))
 
-(defun devdocs-read-entry (subject)
+(defun devdocs-lookup-read-entry (subject)
   "Interactively ask the user for an entry in SUBJECT."
-  (let* ((names (mapcar #'car (devdocs-entries subject)))
-         (hist (intern (format "devdocs--hist-%s" subject)))
+  (let* ((names (mapcar #'car (devdocs-lookup-entries subject)))
+         (hist (intern (format "devdocs-lookup--hist-%s" subject)))
          (symbol (symbol-at-point))
          (best-match
-          (and symbol (devdocs--best-match (symbol-name symbol) names)))
+          (and symbol (devdocs-lookup--best-match (symbol-name symbol) names)))
          (prompt (if best-match
                      (format "Entry (%s) [%s]: " best-match subject)
                    (format "Entry [%s]: " subject))))
     (completing-read prompt names nil :require-match nil hist best-match)))
 
 ;;;###autoload
-(defun devdocs-lookup (subject entry)
+(defun devdocs-lookup-lookup (subject entry)
   "Visit the documentation for ENTRY from SUBJECT in a browser."
   (interactive
    ;; Try to guess the subject from the major mode.
    (let* ((case-fold-search t)
           (major-mode-string
            (replace-regexp-in-string "-mode$" "" (symbol-name major-mode)))
-          (subject-dwim (cadr (cl-assoc major-mode-string devdocs-subjects
+          (subject-dwim (cadr (cl-assoc major-mode-string devdocs-lookup-subjects
                                         :test #'string-match-p)))
           (subject (if current-prefix-arg
-                       (devdocs-read-subject)
-                     (or devdocs--default-subject
+                       (devdocs-lookup-read-subject)
+                     (or devdocs-lookup--default-subject
                          subject-dwim
-                         (devdocs-read-subject))))
-          (entry (devdocs-read-entry subject)))
+                         (devdocs-lookup-read-subject))))
+          (entry (devdocs-lookup-read-entry subject)))
      (when subject
-       (setf devdocs--default-subject subject))
+       (setf devdocs-lookup--default-subject subject))
      (list subject entry)))
-  (let ((path (cdr (assoc entry (devdocs-entries subject)))))
+  (let ((path (cdr (assoc entry (devdocs-lookup-entries subject)))))
     (when path
-      (browse-url (format "%s/%s/%s" devdocs-base-url subject path))
+      (browse-url (format "%s/%s/%s" devdocs-lookup-base-url subject path))
       :found)))
 
 ;;;###autoload
-(defun devdocs-setup ()
-  "Generate an interactive command for each subject (`devdocs-subjects')."
-  (dolist (pair devdocs-subjects)
+(defun devdocs-lookup-setup ()
+  "Generate an interactive command for each subject (`devdocs-lookup-subjects')."
+  (dolist (pair devdocs-lookup-subjects)
     (cl-destructuring-bind (name subject) pair
-      (let ((symbol (intern (format "devdocs-lookup-%s" subject))))
+      (let ((symbol (intern (format "devdocs-lookup-lookup-%s" subject))))
         (defalias symbol
           (lambda ()
             (interactive)
-            (devdocs-lookup subject (devdocs-read-entry subject)))
+            (devdocs-lookup-lookup subject (devdocs-lookup-read-entry subject)))
           (format "Look up documentation for %s on devdocs.io." name))))))
 
 (provide 'devdocs-lookup)
